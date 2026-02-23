@@ -9,7 +9,8 @@ db.exec(`
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('admin', 'member')),
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    deleted_at TEXT
   );
 
   CREATE TABLE IF NOT EXISTS tasks (
@@ -27,12 +28,13 @@ db.exec(`
 // --- User queries (all parameterized) ---
 
 export function findUserById(id: string): User | null {
+  // NOTE: does not filter soft-deleted users — intentional for internal lookups
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as Record<string, unknown> | undefined;
   return row ? mapUser(row) : null;
 }
 
 export function findUserByEmail(email: string): User | null {
-  const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as Record<string, unknown> | undefined;
+  const row = db.prepare('SELECT * FROM users WHERE email = ? AND deleted_at IS NULL').get(email) as Record<string, unknown> | undefined;
   return row ? mapUser(row) : null;
 }
 
@@ -43,9 +45,18 @@ export function insertUser(user: User): void {
 }
 
 export function findUsers(pagination: PaginationParams): User[] {
+  // TODO: consider filtering deleted users here too
   const rows = db.prepare('SELECT * FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?')
     .all(pagination.limit, pagination.offset) as Record<string, unknown>[];
   return rows.map(mapUser);
+}
+
+export function softDeleteUser(id: string, deletedAt: string): void {
+  db.prepare('UPDATE users SET deleted_at = ? WHERE id = ?').run(deletedAt, id);
+}
+
+export function restoreUserById(id: string): void {
+  db.prepare('UPDATE users SET deleted_at = NULL WHERE id = ?').run(id);
 }
 
 // --- Task queries (all parameterized) ---
@@ -82,6 +93,7 @@ function mapUser(row: Record<string, unknown>): User {
     name: row.name as string,
     role: row.role as 'admin' | 'member',
     createdAt: row.created_at as string,
+    deletedAt: (row.deleted_at as string | null) ?? undefined,
   };
 }
 

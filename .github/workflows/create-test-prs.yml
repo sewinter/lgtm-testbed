@@ -1,0 +1,68 @@
+name: Create Test PRs
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: 'Number of PRs to create'
+        default: '3'
+      include_draft:
+        description: 'Include a draft PR (last one)'
+        default: 'true'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create test PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          COUNT=${{ inputs.count }}
+
+          for i in $(seq 1 $COUNT); do
+            BRANCH="test/pr-${{ github.run_number }}-${i}"
+            git checkout main
+            git checkout -b "$BRANCH"
+
+            # Make changes to different files per PR
+            echo "// Change ${i} at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "src/module-${i}.ts"
+            git add .
+            git commit -m "test: update module ${i}
+
+            Automated change for LGTM integration testing.
+            Run: ${{ github.run_number }}, PR: ${i}"
+
+            git push origin "$BRANCH"
+
+            DRAFT_FLAG=""
+            if [ "$i" -eq "$COUNT" ] && [ "${{ inputs.include_draft }}" = "true" ]; then
+              DRAFT_FLAG="--draft"
+            fi
+
+            gh pr create \
+              --title "Test PR ${i}: module-${i} changes" \
+              --body "Automated test PR for LGTM development.
+
+            **Run:** ${{ github.run_number }}
+            **PR index:** ${i} of ${COUNT}" \
+              --base main \
+              --head "$BRANCH" \
+              --reviewer "$OWNER" \
+              $DRAFT_FLAG
+
+            echo "Created PR ${i}/${COUNT}"
+          done
+
+          echo "Done. Created ${COUNT} test PRs."

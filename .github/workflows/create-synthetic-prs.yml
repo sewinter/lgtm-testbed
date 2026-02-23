@@ -1,0 +1,48 @@
+name: Create Synthetic PRs
+on:
+  workflow_dispatch:
+    inputs:
+      pr_specs:
+        description: 'JSON array: [{branch, title, body}]'
+        required: true
+      cleanup:
+        description: 'Close existing synthetic PRs first'
+        default: 'true'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  create-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup existing synthetic PRs
+        if: inputs.cleanup == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Closing existing synthetic PRs..."
+          gh pr list --state open -R ${{ github.repository }} \
+            --json number,title \
+            --jq '.[] | select(.title | startswith("Synthetic:")) | .number' \
+          | while read -r num; do
+            gh pr close "$num" -R ${{ github.repository }} --delete-branch || true
+            echo "  Closed PR #${num}"
+          done
+
+      - name: Create PRs and request reviews
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          echo '${{ inputs.pr_specs }}' | jq -c '.[]' | while read -r spec; do
+            BRANCH=$(echo "$spec" | jq -r '.branch')
+            TITLE=$(echo "$spec" | jq -r '.title')
+            BODY=$(echo "$spec" | jq -r '.body')
+            echo "Creating PR: $TITLE (branch: $BRANCH)"
+            gh pr create -R "${{ github.repository }}" \
+              --title "$TITLE" --body "$BODY" \
+              --base main --head "$BRANCH" \
+              --reviewer "$OWNER" || echo "  Failed to create PR for $BRANCH"
+          done

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { withRateLimiter } from '../middleware/rate-limiter.js';
 import { withAuth } from '../middleware/auth.js';
 import { withValidation } from '../middleware/validate.js';
-import { createUser, getUserById, listUsers } from '../services/user-service.js';
+import { createUser, getUserById, listUsers, bulkDeleteUsers } from '../services/user-service.js';
 import { notFound } from '../errors.js';
 
 const router = Router();
@@ -36,6 +36,22 @@ router.post('/',
   async (req, res) => {
     const user = await createUser(req.body);
     res.status(201).json({ user });
+  },
+);
+
+// DELETE /users/bulk — bulk delete users by ID list (admin only)
+// TODO: add role check once RBAC is wired up
+router.delete('/bulk',
+  withRateLimiter({ windowMs: 60_000, max: 20 }),
+  async (req, res) => {
+    const { ids } = req.body as { ids?: string[] };
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No IDs provided' });
+    }
+
+    const deleted = await bulkDeleteUsers(ids);
+    res.json({ deleted });
   },
 );
 

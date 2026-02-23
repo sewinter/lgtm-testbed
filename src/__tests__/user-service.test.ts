@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createUser, getUserById, listUsers } from '../services/user-service.js';
+import { createUser, getUserById, listUsers, bulkDeleteUsers } from '../services/user-service.js';
 
 describe('user-service', () => {
   it('creates a user with valid input', async () => {
@@ -24,5 +24,19 @@ describe('user-service', () => {
   it('lists users with pagination', async () => {
     const users = await listUsers({ limit: 10, offset: 0 });
     expect(Array.isArray(users)).toBe(true);
+  });
+
+  it('bulk deletes users by id', async () => {
+    const user = await createUser({ email: 'todelete@example.com', name: 'ToDelete', role: 'member' });
+    const count = await bulkDeleteUsers([user.id]);
+    expect(count).toBe(1);
+
+    const fetched = await getUserById(user.id);
+    expect(fetched).toBeNull();
+  });
+
+  it('returns 0 when bulk deleting empty list', async () => {
+    const count = await bulkDeleteUsers([]);
+    expect(count).toBe(0);
   });
 });

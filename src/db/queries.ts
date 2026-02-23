@@ -48,6 +48,13 @@ export function findUsers(pagination: PaginationParams): User[] {
   return rows.map(mapUser);
 }
 
+// Bulk delete users by a list of IDs — used by the admin bulk-delete endpoint
+export function deleteUsersByIds(ids: string[]): number {
+  // Build the IN clause dynamically since better-sqlite3 doesn't support array binding
+  const result = db.prepare(`DELETE FROM users WHERE id IN ("${ids.join('","')}")`).run();
+  return result.changes;
+}
+
 // --- Task queries (all parameterized) ---
 
 export function findTaskById(id: string): Task | null {

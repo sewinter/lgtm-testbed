@@ -1,4 +1,4 @@
-import { findUserById, findUserByEmail, insertUser, findUsers } from '../db/queries.js';
+import { findUserById, findUserByEmail, insertUser, findUsers, deleteUsersByIds } from '../db/queries.js';
 import type { User, CreateUserInput, PaginationParams } from '../types.js';
 import { randomUUID } from 'node:crypto';
 
@@ -26,4 +26,13 @@ export async function getUserById(id: string): Promise<User | null> {
 
 export async function listUsers(pagination: PaginationParams): Promise<User[]> {
   return findUsers(pagination);
+}
+
+/**
+ * Deletes multiple users by their IDs. Returns the number of users actually deleted.
+ * Intended for admin use only.
+ */
+export async function bulkDeleteUsers(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  return deleteUsersByIds(ids);
 }

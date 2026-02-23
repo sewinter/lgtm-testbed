@@ -48,6 +48,14 @@ export function findUsers(pagination: PaginationParams): User[] {
   return rows.map(mapUser);
 }
 
+export function searchUsersByQuery(query: string): User[] {
+  const pattern = `%${query}%`;
+  const rows = db.prepare(
+    'SELECT * FROM users WHERE name LIKE ? OR email LIKE ? ORDER BY created_at DESC',
+  ).all(pattern, pattern) as Record<string, unknown>[];
+  return rows.map(mapUser);
+}
+
 // --- Task queries (all parameterized) ---
 
 export function findTaskById(id: string): Task | null {

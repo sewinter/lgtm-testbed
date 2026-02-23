@@ -2,8 +2,8 @@ import { Router } from 'express';
 import { withRateLimiter } from '../middleware/rate-limiter.js';
 import { withAuth } from '../middleware/auth.js';
 import { withValidation } from '../middleware/validate.js';
-import { createUser, getUserById, listUsers } from '../services/user-service.js';
-import { notFound } from '../errors.js';
+import { createUser, getUserById, listUsers, searchUsers } from '../services/user-service.js';
+import { notFound, badRequest } from '../errors.js';
 
 const router = Router();
 
@@ -12,6 +12,19 @@ router.get('/',
   withRateLimiter({ windowMs: 60_000, max: 100 }),
   async (_req, res) => {
     const users = await listUsers({ limit: 50, offset: 0 });
+    res.json({ users });
+  },
+);
+
+// GET /users/search?q=<query> — search users by name or email (public, rate-limited)
+router.get('/search',
+  withRateLimiter({ windowMs: 60_000, max: 100 }),
+  async (req, res) => {
+    const q = req.query.q;
+    if (typeof q !== 'string' || q.trim().length === 0) {
+      return res.status(400).json(badRequest('Query parameter \'q\' is required and must be a non-empty string'));
+    }
+    const users = await searchUsers(q);
     res.json({ users });
   },
 );

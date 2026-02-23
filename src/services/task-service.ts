@@ -1,6 +1,7 @@
 import { findTaskById, insertTask, findTasks, updateTaskById } from '../db/queries.js';
 import type { Task, CreateTaskInput, UpdateTaskInput, PaginationParams } from '../types.js';
 import { randomUUID } from 'node:crypto';
+import { notifyTaskEvent } from './notification-service.js';
 
 export async function createTask(input: CreateTaskInput): Promise<Task> {
   const now = new Date().toISOString();
@@ -15,6 +16,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   };
 
   insertTask(task);
+  await notifyTaskEvent(task, 'task.created');
   return task;
 }
 
@@ -35,6 +37,10 @@ export async function updateTask(id: string, input: UpdateTaskInput): Promise<Ta
     ...input,
     updatedAt: new Date().toISOString(),
   };
+
+  // Send notification based on the current in-memory state before persisting,
+  // so the assignee gets a heads-up as soon as possible.
+  await notifyTaskEvent(updated, 'task.updated');
 
   updateTaskById(updated);
   return updated;

@@ -3,6 +3,7 @@ import { withRateLimiter } from '../middleware/rate-limiter.js';
 import { withAuth } from '../middleware/auth.js';
 import { withValidation } from '../middleware/validate.js';
 import { createTask, getTaskById, listTasks, updateTask } from '../services/task-service.js';
+import { notifyTaskEvent } from '../services/notification-service.js';
 import { notFound } from '../errors.js';
 
 const router = Router();
@@ -50,6 +51,19 @@ router.patch('/:id',
       return res.status(404).json(notFound('Task', req.params.id));
     }
     res.json({ task });
+  },
+);
+
+// POST /tasks/:id/notify — manually trigger a notification for a task (authenticated)
+router.post('/:id/notify',
+  withAuth,
+  async (req, res) => {
+    const task = await getTaskById(req.params.id);
+    if (!task) {
+      return res.status(404).json(notFound('Task', req.params.id));
+    }
+    await notifyTaskEvent(task, 'task.notify');
+    res.json({ ok: true });
   },
 );
 

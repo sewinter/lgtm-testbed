@@ -1,0 +1,18 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run checks
+        run: |
+          if [ -f ".ci-should-fail" ]; then
+            echo "::error::CI failure marker detected"
+            exit 1
+          fi
+          echo "All checks passed"

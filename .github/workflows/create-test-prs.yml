@@ -2,11 +2,8 @@ name: Create Test PRs
 on:
   workflow_dispatch:
     inputs:
-      count:
-        description: 'Number of PRs to create'
-        default: '3'
-      include_draft:
-        description: 'Include a draft PR (last one)'
+      cleanup:
+        description: 'Close existing test PRs before creating new ones'
         default: 'true'
 
 permissions:
@@ -18,51 +15,138 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Create test PRs
+      - name: Cleanup old test PRs
+        if: inputs.cleanup == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Closing existing test PRs..."
+          gh pr list --state open --json number,title --jq '.[] | select(.title | startswith("Test PR")) | .number' | while read -r num; do
+            gh pr close "$num" --delete-branch || true
+            echo "  Closed PR #${num}"
+          done
+
+      - name: Create readiness test PRs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           OWNER="${{ github.repository_owner }}"
-          COUNT=${{ inputs.count }}
+          RUN="${{ github.run_number }}"
 
-          for i in $(seq 1 $COUNT); do
-            BRANCH="test/pr-${{ github.run_number }}-${i}"
-            git checkout main
-            git checkout -b "$BRANCH"
+          # ── PR 1: ready (normal open PR, CI passes) ──
+          BRANCH="test/ready-${RUN}"
+          git checkout main
+          git checkout -b "$BRANCH"
+          echo "// Ready PR change at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> src/module-1.ts
+          git add .
+          git commit -m "feat: add ready module changes
 
-            # Make changes to different files per PR
-            echo "// Change ${i} at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "src/module-${i}.ts"
-            git add .
-            git commit -m "test: update module ${i}
+          Normal PR that should classify as ready.
+          Run: ${RUN}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "Test PR 1: ready state" \
+            --body "This PR should classify as **ready**. Normal open PR, CI passes, no conflicts." \
+            --base main --head "$BRANCH" --reviewer "$OWNER"
+          echo "Created PR 1 (ready)"
 
-            Automated change for LGTM integration testing.
-            Run: ${{ github.run_number }}, PR: ${i}"
+          # ── PR 2: draft ──
+          BRANCH="test/draft-${RUN}"
+          git checkout main
+          git checkout -b "$BRANCH"
+          echo "// Draft PR change at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> src/module-2.ts
+          git add .
+          git commit -m "wip: draft module changes
 
-            git push origin "$BRANCH"
+          Draft PR for readiness testing.
+          Run: ${RUN}"
+          git push origin "$BRANCH"
+          gh pr create --draft \
+            --title "Test PR 2: draft state" \
+            --body "This PR should classify as **draft**." \
+            --base main --head "$BRANCH" --reviewer "$OWNER"
+          echo "Created PR 2 (draft)"
 
-            DRAFT_FLAG=""
-            if [ "$i" -eq "$COUNT" ] && [ "${{ inputs.include_draft }}" = "true" ]; then
-              DRAFT_FLAG="--draft"
-            fi
+          # ── PR 3: ci_failing (includes .ci-should-fail marker) ──
+          BRANCH="test/ci-fail-${RUN}"
+          git checkout main
+          git checkout -b "$BRANCH"
+          echo "// CI-failing PR change at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> src/module-3.ts
+          echo "This file triggers CI failure" > .ci-should-fail
+          git add .
+          git commit -m "test: add ci-failing module changes
 
-            gh pr create \
-              --title "Test PR ${i}: module-${i} changes" \
-              --body "Automated test PR for LGTM development.
+          PR with CI failure marker for readiness testing.
+          Run: ${RUN}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "Test PR 3: ci_failing state" \
+            --body "This PR should classify as **ci_failing**. Contains .ci-should-fail marker." \
+            --base main --head "$BRANCH" --reviewer "$OWNER"
+          echo "Created PR 3 (ci_failing)"
 
-            **Run:** ${{ github.run_number }}
-            **PR index:** ${i} of ${COUNT}" \
-              --base main \
-              --head "$BRANCH" \
-              --reviewer "$OWNER" \
-              $DRAFT_FLAG
+          # ── PR 4: merge_conflict ──
+          # First, push a conflicting change to main
+          git checkout main
+          echo "// Main branch content for conflict at $(date -u +%Y-%m-%dT%H:%M:%SZ)" > src/conflict-target.ts
+          git add .
+          git commit -m "chore: add conflict target file on main
 
-            echo "Created PR ${i}/${COUNT}"
-          done
+          Sets up the main side of a merge conflict.
+          Run: ${RUN}"
+          git push origin main
 
-          echo "Done. Created ${COUNT} test PRs."
+          # Now create a branch from before that commit with a conflicting change
+          git checkout HEAD~1
+          BRANCH="test/conflict-${RUN}"
+          git checkout -b "$BRANCH"
+          echo "// Branch content that conflicts at $(date -u +%Y-%m-%dT%H:%M:%SZ)" > src/conflict-target.ts
+          git add .
+          git commit -m "test: add conflicting module changes
+
+          PR that conflicts with main for readiness testing.
+          Run: ${RUN}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "Test PR 4: merge_conflict state" \
+            --body "This PR should classify as **merge_conflict**. Has conflicting changes to src/conflict-target.ts." \
+            --base main --head "$BRANCH" --reviewer "$OWNER"
+          echo "Created PR 4 (merge_conflict)"
+
+          # ── PR 5: waiting_on_author (requires manual review step) ──
+          git checkout main
+          BRANCH="test/waiting-${RUN}"
+          git checkout -b "$BRANCH"
+          echo "// Waiting-on-author PR change at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> src/module-5.ts
+          git add .
+          git commit -m "feat: add waiting module changes
+
+          PR for waiting_on_author testing. Requires manual CHANGES_REQUESTED review.
+          Run: ${RUN}"
+          git push origin "$BRANCH"
+          PR_URL=$(gh pr create \
+            --title "Test PR 5: waiting_on_author state (needs manual review)" \
+            --body "This PR needs a manual step to classify as **waiting_on_author**.
+
+          After this workflow completes, run:
+          \`\`\`
+          gh pr review <number> -R sewinter/lgtm-testbed --request-changes -b 'Requesting changes for readiness testing'
+          \`\`\`
+
+          Until the manual review, this PR will classify as **ready**." \
+            --base main --head "$BRANCH" --reviewer "$OWNER")
+          echo "Created PR 5 (waiting_on_author — needs manual review)"
+          echo ""
+          echo "=========================================="
+          echo "MANUAL STEP REQUIRED for waiting_on_author:"
+          echo "  ${PR_URL}"
+          echo "  Run: gh pr review <number> -R sewinter/lgtm-testbed --request-changes -b 'Test changes requested'"
+          echo "=========================================="

@@ -48,6 +48,11 @@ export function findUsers(pagination: PaginationParams): User[] {
   return rows.map(mapUser);
 }
 
+export function countUsers(): number {
+  const row = db.prepare('SELECT COUNT(*) as total FROM users').get() as { total: number };
+  return row.total;
+}
+
 // --- Task queries (all parameterized) ---
 
 export function findTaskById(id: string): Task | null {

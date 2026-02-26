@@ -1,4 +1,4 @@
-import { findUserById, findUserByEmail, insertUser, findUsers } from '../db/queries.js';
+import { findUserById, findUserByEmail, insertUser, findUsers, searchUsers as dbSearchUsers } from '../db/queries.js';
 import type { User, CreateUserInput, PaginationParams } from '../types.js';
 import { randomUUID } from 'node:crypto';
 
@@ -26,4 +26,13 @@ export async function getUserById(id: string): Promise<User | null> {
 
 export async function listUsers(pagination: PaginationParams): Promise<User[]> {
   return findUsers(pagination);
+}
+
+export interface UserSearchInput extends PaginationParams {
+  name?: string;
+  email?: string;
+}
+
+export async function searchUsers(input: UserSearchInput): Promise<User[]> {
+  return dbSearchUsers(input);
 }

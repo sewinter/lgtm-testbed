@@ -48,6 +48,33 @@ export function findUsers(pagination: PaginationParams): User[] {
   return rows.map(mapUser);
 }
 
+export interface UserSearchParams extends PaginationParams {
+  name?: string;
+  email?: string;
+}
+
+export function searchUsers(params: UserSearchParams): User[] {
+  const conditions: string[] = [];
+  const bindings: unknown[] = [];
+
+  if (params.name) {
+    conditions.push('LOWER(name) LIKE ?');
+    bindings.push(`%${params.name.toLowerCase()}%`);
+  }
+
+  if (params.email) {
+    conditions.push('LOWER(email) LIKE ?');
+    bindings.push(`%${params.email.toLowerCase()}%`);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const rows = db.prepare(
+    `SELECT * FROM users ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+  ).all(...bindings, params.limit, params.offset) as Record<string, unknown>[];
+
+  return rows.map(mapUser);
+}
+
 // --- Task queries (all parameterized) ---
 
 export function findTaskById(id: string): Task | null {

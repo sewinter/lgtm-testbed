@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import type { User, Task, PaginationParams } from '../types.js';
+import type { User, Task, Comment, PaginationParams } from '../types.js';
 
 const db = new Database(':memory:');
 
@@ -21,6 +21,15 @@ db.exec(`
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (assignee_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS comments (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL,
+    author_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (task_id) REFERENCES tasks(id)
   );
 `);
 
@@ -73,6 +82,20 @@ export function updateTaskById(task: Task): void {
   ).run(task.title, task.description, task.status, task.assigneeId, task.updatedAt, task.id);
 }
 
+// --- Comment queries (all parameterized) ---
+
+export function findCommentsByTaskId(taskId: string): Comment[] {
+  const rows = db.prepare('SELECT * FROM comments WHERE task_id = ? ORDER BY created_at ASC')
+    .all(taskId) as Record<string, unknown>[];
+  return rows.map(mapComment);
+}
+
+export function insertComment(comment: Comment): void {
+  db.prepare(
+    'INSERT INTO comments (id, task_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)',
+  ).run(comment.id, comment.taskId, comment.authorId, comment.body, comment.createdAt);
+}
+
 // --- Row mappers ---
 
 function mapUser(row: Record<string, unknown>): User {
@@ -94,5 +117,15 @@ function mapTask(row: Record<string, unknown>): Task {
     assigneeId: row.assignee_id as string,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+  };
+}
+
+function mapComment(row: Record<string, unknown>): Comment {
+  return {
+    id: row.id as string,
+    taskId: row.task_id as string,
+    authorId: row.author_id as string,
+    body: row.body as string,
+    createdAt: row.created_at as string,
   };
 }

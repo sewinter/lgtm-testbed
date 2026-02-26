@@ -1,6 +1,7 @@
 import express from 'express';
 import { userRoutes } from './routes/users.js';
 import { taskRoutes } from './routes/tasks.js';
+import { commentRoutes } from './routes/comments.js';
 
 const app = express();
 app.use(express.json());
@@ -13,6 +14,7 @@ app.get('/health', (_req, res) => {
 // API routes
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/tasks/:id/comments', commentRoutes);
 
 const PORT = process.env.PORT ?? 3000;
 app.listen(PORT, () => {

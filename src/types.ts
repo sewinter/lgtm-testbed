@@ -4,6 +4,7 @@ export interface User {
   name: string;
   role: 'admin' | 'member';
   createdAt: string;
+  deletedAt?: string | null;
 }
 
 export interface Task {

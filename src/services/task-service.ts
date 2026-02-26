@@ -1,6 +1,7 @@
 import { findTaskById, insertTask, findTasks, updateTaskById } from '../db/queries.js';
 import type { Task, CreateTaskInput, UpdateTaskInput, PaginationParams } from '../types.js';
 import { randomUUID } from 'node:crypto';
+import { notifyAssignee } from './notification-service.js';
 
 export async function createTask(input: CreateTaskInput): Promise<Task> {
   const now = new Date().toISOString();
@@ -35,6 +36,11 @@ export async function updateTask(id: string, input: UpdateTaskInput): Promise<Ta
     ...input,
     updatedAt: new Date().toISOString(),
   };
+
+  // Notify the assignee about the update — do this before persisting so we
+  // can include the "before" state in the message if needed in future.
+  // NOTE: notifyAssignee uses `updated` which reflects the new values.
+  await notifyAssignee(updated, `Task "${updated.title}" has been updated`);
 
   updateTaskById(updated);
   return updated;

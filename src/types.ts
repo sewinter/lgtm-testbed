@@ -16,6 +16,14 @@ export interface Task {
   updatedAt: string;
 }
 
+export interface Comment {
+  id: string;
+  taskId: string;
+  authorId: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface ApiError {
   status: number;
   code: string;
@@ -49,4 +57,9 @@ export interface UpdateTaskInput {
   description?: string;
   status?: 'todo' | 'in_progress' | 'done';
   assigneeId?: string;
+}
+
+export interface CreateCommentInput {
+  authorId: string;
+  body: string;
 }

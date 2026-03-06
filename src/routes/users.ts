@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { withRateLimiter } from '../middleware/rate-limiter.js';
 import { withAuth } from '../middleware/auth.js';
 import { withValidation } from '../middleware/validate.js';
-import { createUser, getUserById, listUsers } from '../services/user-service.js';
+import { createUser, getUserById, listUsers, deleteUser, restoreUser } from '../services/user-service.js';
 import { notFound } from '../errors.js';
 
 const router = Router();
@@ -36,6 +36,33 @@ router.post('/',
   async (req, res) => {
     const user = await createUser(req.body);
     res.status(201).json({ user });
+  },
+);
+
+// DELETE /users/:id — soft-delete a user (authenticated, rate-limited)
+router.delete('/:id',
+  withRateLimiter({ windowMs: 60_000, max: 50 }),
+  withAuth,
+  async (req, res) => {
+    const deleted = await deleteUser(req.params.id);
+    if (!deleted) {
+      return res.status(404).json(notFound('User', req.params.id));
+    }
+    res.status(204).send();
+  },
+);
+
+// POST /users/:id/restore — restore a soft-deleted user (authenticated, rate-limited)
+router.post('/:id/restore',
+  withRateLimiter({ windowMs: 60_000, max: 50 }),
+  withAuth,
+  async (req, res) => {
+    const user = await restoreUser(req.params.id);
+    if (!user) {
+      // User not found or not in a deleted state
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json({ user });
   },
 );
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createUser, getUserById, listUsers } from '../services/user-service.js';
+import { createUser, getUserById, listUsers, deleteUser } from '../services/user-service.js';
 
 describe('user-service', () => {
   it('creates a user with valid input', async () => {
@@ -24,5 +24,19 @@ describe('user-service', () => {
   it('lists users with pagination', async () => {
     const users = await listUsers({ limit: 10, offset: 0 });
     expect(Array.isArray(users)).toBe(true);
+  });
+
+  it('deletes a user by id', async () => {
+    const user = await createUser({ email: 'todelete@example.com', name: 'ToDelete', role: 'member' });
+    const result = await deleteUser(user.id);
+    // hard delete — user should be gone
+    expect(result).toBe(true);
+    const fetched = await getUserById(user.id);
+    expect(fetched).toBeNull();
+  });
+
+  it('returns false when deleting nonexistent user', async () => {
+    const result = await deleteUser('nonexistent-id');
+    expect(result).toBe(false);
   });
 });

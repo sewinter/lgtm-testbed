@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { withRateLimiter } from '../middleware/rate-limiter.js';
 import { withAuth } from '../middleware/auth.js';
 import { withValidation } from '../middleware/validate.js';
-import { createUser, getUserById, listUsers } from '../services/user-service.js';
+import { createUser, getUserById, listUsers, searchUsers } from '../services/user-service.js';
 import { notFound } from '../errors.js';
 
 const router = Router();
@@ -12,6 +12,20 @@ router.get('/',
   withRateLimiter({ windowMs: 60_000, max: 100 }),
   async (_req, res) => {
     const users = await listUsers({ limit: 50, offset: 0 });
+    res.json({ users });
+  },
+);
+
+// GET /users/search — search users by name and/or email (public, rate-limited)
+router.get('/search',
+  withRateLimiter({ windowMs: 60_000, max: 100 }),
+  async (req, res) => {
+    const name = typeof req.query.name === 'string' ? req.query.name.trim() : undefined;
+    const email = typeof req.query.email === 'string' ? req.query.email.trim() : undefined;
+    const limit = Math.min(Number(req.query.limit ?? 50), 100);
+    const offset = Number(req.query.offset ?? 0);
+
+    const users = await searchUsers({ name, email, limit, offset });
     res.json({ users });
   },
 );

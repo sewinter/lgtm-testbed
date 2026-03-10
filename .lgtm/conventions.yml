@@ -1,0 +1,33 @@
+version: 1
+conventions:
+  - rule: All error responses must use the toErrorResponse() function (or its named
+      wrappers like notFound(), badRequest(), etc.) instead of returning raw
+      error objects.
+    context: The team has a standardized error response format enforced through the
+      toErrorResponse() helper in src/errors.ts for consistency across all route
+      handlers.
+    paths:
+      - src/routes/**/*.ts
+    exclude_paths:
+      - src/routes/**/*.test.ts
+      - src/routes/**/*.spec.ts
+  - rule: All routes that expose content must include the withAuth middleware to
+      prevent unauthorized access.
+    context: Authentication is required on all content-exposing endpoints to prevent
+      unauthenticated access to sensitive data such as task titles, assignee
+      IDs, and free-text messages.
+    paths:
+      - src/routes/**/*.ts
+    exclude_paths:
+      - src/routes/**/*.test.ts
+      - src/routes/**/*.spec.ts
+  - rule: All mutating routes must include the withRateLimiter middleware to prevent
+      resource exhaustion attacks.
+    context: Rate limiting on all side-effect-producing endpoints protects against
+      DoS attacks and unbounded in-memory accumulation of records in
+      long-running servers.
+    paths:
+      - src/routes/**/*.ts
+    exclude_paths:
+      - src/routes/**/*.test.ts
+      - src/routes/**/*.spec.ts

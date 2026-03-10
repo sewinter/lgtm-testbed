@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { withRateLimiter } from '../middleware/rate-limiter.js';
 import { withAuth } from '../middleware/auth.js';
 import { withValidation } from '../middleware/validate.js';
-import { createTask, getTaskById, listTasks, updateTask } from '../services/task-service.js';
+import { createTask, getTaskById, listTasks, updateTask, getTaskPriority } from '../services/task-service.js';
 import { notFound } from '../errors.js';
 
 const router = Router();
@@ -25,6 +25,18 @@ router.get('/:id',
       return res.status(404).json(notFound('Task', req.params.id));
     }
     res.json({ task });
+  },
+);
+
+// GET /tasks/:id/priority — get computed priority (public, rate-limited)
+router.get('/:id/priority',
+  withRateLimiter({ windowMs: 60_000, max: 100 }),
+  async (req, res) => {
+    const priority = await getTaskPriority(req.params.id);
+    if (priority === null) {
+      return res.status(404).json(notFound('Task', req.params.id));
+    }
+    res.json({ taskId: req.params.id, priority });
   },
 );
 

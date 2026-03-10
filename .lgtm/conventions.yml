@@ -1,0 +1,53 @@
+version: 1
+conventions:
+  - rule: All routes must include withRateLimiter middleware.
+    context: Rate limiting is critical for protecting endpoints from abuse and has
+      been a repeated concern in code reviews.
+    paths:
+      - src/routes/**
+  - rule: All mutation endpoints (POST, PATCH, DELETE) and endpoints serving
+      sensitive content must use withAuth middleware.
+    context: Authentication is required to protect sensitive operations and data
+      from unauthorized access.
+    paths:
+      - src/routes/**
+  - rule: Route handlers must not import from src/db/ directly — all data access
+      must go through src/services/.
+    context: Centralizing data access in services enforces consistent business rules
+      and keeps routes thin.
+    paths:
+      - src/routes/**
+  - rule: Error responses must use factory functions from src/errors.ts (notFound(),
+      badRequest(), etc.) via the ErrorResponse type.
+    context: Using standardized error factories ensures client-side error parsing
+      works consistently across the API.
+    paths:
+      - src/routes/**
+  - rule: All SQL queries must use parameterized statements with ? placeholders,
+      never string interpolation or concatenation.
+    context: Parameterized queries prevent SQL injection attacks, a critical
+      security vulnerability.
+    paths:
+      - src/db/**
+      - src/services/**
+  - rule: Query parameters must be validated using withValidation middleware or
+      manual guards; numeric params (limit, offset) require NaN/negative checks
+      and clamping; LIKE patterns require wildcard escaping.
+    context: Input validation prevents injection attacks, denial of service, and
+      other malicious behavior.
+    paths:
+      - src/routes/**
+  - rule: New exported service functions must have unit tests covering the success
+      path and at least one error/edge case.
+    context: Test coverage ensures service functions behave correctly under normal
+      and exceptional conditions.
+    paths:
+      - src/services/**
+    severity: warning
+  - rule: Side effects (notifications, emails) must not block core persistence —
+      persist the primary write first, then execute side effects in try/catch
+      blocks.
+    context: Decoupling side effects from core writes prevents transient failures
+      (e.g., email service outages) from breaking data persistence.
+    paths:
+      - src/services/**
